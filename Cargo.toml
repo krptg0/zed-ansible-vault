@@ -1,0 +1,25 @@
+[package]
+name = "zed-ansible-vault"
+version.workspace = true
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.7.0"
+
+[workspace]
+members = ["server"]
+
+[workspace.package]
+version = "0.1.0"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

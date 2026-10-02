@@ -1,0 +1,11 @@
+id = "ansible-vault-lsp"
+name = "Ansible Vault"
+version = "0.1.0"
+schema_version = 1
+authors = ["krptg0"]
+description = "Encrypt, decrypt and preview ansible-vault values and files (inline `!vault |` or whole file) through code actions and hover."
+repository = "https://github.com/krptg0/zed-ansible-vault"
+
+[language_servers.ansible-vault-lsp]
+name = "Ansible Vault"
+languages = ["YAML", "Ansible", "Plain Text"]
