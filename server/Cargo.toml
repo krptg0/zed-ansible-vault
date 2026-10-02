@@ -6,12 +6,25 @@ license = "MIT"
 description = "Language server exposing ansible-vault encrypt/decrypt code actions and hover"
 publish = false
 
+[lib]
+path = "src/lib.rs"
+
 [[bin]]
 name = "ansible-vault-lsp"
 path = "src/main.rs"
 
 [dependencies]
+aes = "0.9"
+ctr = "0.10"
+getrandom = "0.4"
+hex = "0.4"
+hmac = "0.13"
 lsp-server = "0.10"
 lsp-types = "0.97"
+pbkdf2 = "0.13"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.11"
+
+[dev-dependencies]
+tempfile = "3"

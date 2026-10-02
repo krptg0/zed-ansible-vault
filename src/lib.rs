@@ -39,9 +39,11 @@ impl zed::Extension for AnsibleVaultExtension {
         language_server_id: &LanguageServerId,
         worktree: &Worktree,
     ) -> Result<Option<zed::serde_json::Value>> {
-        Ok(LspSettings::for_worktree(language_server_id.as_ref(), worktree)
-            .ok()
-            .and_then(|settings| settings.initialization_options))
+        Ok(
+            LspSettings::for_worktree(language_server_id.as_ref(), worktree)
+                .ok()
+                .and_then(|settings| settings.initialization_options),
+        )
     }
 }
 

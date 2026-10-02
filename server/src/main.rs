@@ -35,7 +35,10 @@ fn main() {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
-            code_action_kinds: Some(vec![CodeActionKind::REFACTOR_REWRITE, CodeActionKind::SOURCE]),
+            code_action_kinds: Some(vec![
+                CodeActionKind::REFACTOR_REWRITE,
+                CodeActionKind::SOURCE,
+            ]),
             resolve_provider: Some(true),
             work_done_progress_options: Default::default(),
         })),
@@ -65,7 +68,8 @@ fn main() {
 fn handle_notification(docs: &mut HashMap<String, Doc>, not: Notification) {
     match not.method.as_str() {
         DidOpenTextDocument::METHOD => {
-            let p: lsp_types::DidOpenTextDocumentParams = serde_json::from_value(not.params).unwrap();
+            let p: lsp_types::DidOpenTextDocumentParams =
+                serde_json::from_value(not.params).unwrap();
             log(format!(
                 "didOpen {} lang={} v={}",
                 p.text_document.uri.as_str(),
@@ -74,15 +78,22 @@ fn handle_notification(docs: &mut HashMap<String, Doc>, not: Notification) {
             ));
             docs.insert(
                 p.text_document.uri.as_str().to_string(),
-                Doc { text: p.text_document.text, version: p.text_document.version },
+                Doc {
+                    text: p.text_document.text,
+                    version: p.text_document.version,
+                },
             );
         }
         DidChangeTextDocument::METHOD => {
-            let p: lsp_types::DidChangeTextDocumentParams = serde_json::from_value(not.params).unwrap();
+            let p: lsp_types::DidChangeTextDocumentParams =
+                serde_json::from_value(not.params).unwrap();
             if let Some(change) = p.content_changes.into_iter().last() {
                 docs.insert(
                     p.text_document.uri.as_str().to_string(),
-                    Doc { text: change.text, version: p.text_document.version },
+                    Doc {
+                        text: change.text,
+                        version: p.text_document.version,
+                    },
                 );
             }
             log(format!("didChange v={}", p.text_document.version));
@@ -99,7 +110,12 @@ fn handle_request(connection: &Connection, docs: &HashMap<String, Doc>, req: Req
             let r = p.range;
             log(format!(
                 "codeAction {}:{}-{}:{} only={:?} trigger={:?}",
-                r.start.line, r.start.character, r.end.line, r.end.character, p.context.only, p.context.trigger_kind
+                r.start.line,
+                r.start.character,
+                r.end.line,
+                r.end.character,
+                p.context.only,
+                p.context.trigger_kind
             ));
             let mut actions = Vec::new();
             let make = |title: String| {
@@ -121,7 +137,11 @@ fn handle_request(connection: &Connection, docs: &HashMap<String, Doc>, req: Req
                 )));
             }
             if let Some(d) = doc {
-                if d.text.lines().nth(r.start.line as usize).is_some_and(|l| l.contains("!vault")) {
+                if d.text
+                    .lines()
+                    .nth(r.start.line as usize)
+                    .is_some_and(|l| l.contains("!vault"))
+                {
                     actions.push(make("Ansible Vault (spike): vault line".into()));
                 }
             }
@@ -134,7 +154,10 @@ fn handle_request(connection: &Connection, docs: &HashMap<String, Doc>, req: Req
             let uri_str = data["uri"].as_str().unwrap().to_string();
             let range: Range = serde_json::from_value(data["range"].clone()).unwrap();
             let version = docs.get(&uri_str).map(|d| d.version);
-            show(connection, &format!("spike: resolve called for '{}'", action.title));
+            show(
+                connection,
+                &format!("spike: resolve called for '{}'", action.title),
+            );
             let insert_at = Position::new(range.start.line, 0);
             action.edit = Some(WorkspaceEdit {
                 document_changes: Some(lsp_types::DocumentChanges::Edits(vec![TextDocumentEdit {
@@ -158,9 +181,15 @@ fn handle_request(connection: &Connection, docs: &HashMap<String, Doc>, req: Req
             serde_json::to_value(Hover {
                 contents: HoverContents::Markup(MarkupContent {
                     kind: MarkupKind::Markdown,
-                    value: format!("**Ansible Vault (spike)**\n\n```yaml\nline: {}\n```", pos.line),
+                    value: format!(
+                        "**Ansible Vault (spike)**\n\n```yaml\nline: {}\n```",
+                        pos.line
+                    ),
                 }),
-                range: Some(Range::new(Position::new(pos.line, 0), Position::new(pos.line + 1, 0))),
+                range: Some(Range::new(
+                    Position::new(pos.line, 0),
+                    Position::new(pos.line + 1, 0),
+                )),
             })
             .unwrap()
         }
@@ -176,10 +205,16 @@ fn handle_request(connection: &Connection, docs: &HashMap<String, Doc>, req: Req
 }
 
 fn show(connection: &Connection, message: &str) {
-    let params = ShowMessageParams { typ: MessageType::INFO, message: message.into() };
+    let params = ShowMessageParams {
+        typ: MessageType::INFO,
+        message: message.into(),
+    };
     connection
         .sender
-        .send(Message::Notification(Notification::new(ShowMessage::METHOD.into(), params)))
+        .send(Message::Notification(Notification::new(
+            ShowMessage::METHOD.into(),
+            params,
+        )))
         .unwrap();
 }
 
@@ -187,5 +222,7 @@ fn covers_whole(text: &str, r: &Range) -> bool {
     let lines: Vec<&str> = text.split('\n').collect();
     let last = lines.len().saturating_sub(1) as u32;
     let last_len = lines.last().map(|l| l.encode_utf16().count()).unwrap_or(0) as u32;
-    r.start == Position::new(0, 0) && r.end.line >= last && (r.end.line > last || r.end.character >= last_len)
+    r.start == Position::new(0, 0)
+        && r.end.line >= last
+        && (r.end.line > last || r.end.character >= last_len)
 }
