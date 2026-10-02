@@ -256,7 +256,7 @@ fn pkcs7_pad(data: &[u8]) -> Vec<u8> {
 fn pkcs7_unpad(data: &mut Vec<u8>) -> Result<(), VaultError> {
     let invalid = || VaultError::Format("invalid padding bytes".into());
     let pad = *data.last().ok_or_else(invalid)? as usize;
-    if pad == 0 || pad > BLOCK_LEN || pad > data.len() || data.len() % BLOCK_LEN != 0 {
+    if pad == 0 || pad > BLOCK_LEN || pad > data.len() || !data.len().is_multiple_of(BLOCK_LEN) {
         return Err(invalid());
     }
     if !data[data.len() - pad..].iter().all(|&b| b as usize == pad) {
