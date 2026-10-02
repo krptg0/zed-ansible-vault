@@ -14,6 +14,13 @@ Encryption is implemented natively in Rust (`$ANSIBLE_VAULT;1.1;AES256`, and
 `1.2` with a vault id). It is byte-compatible with `ansible-vault` and checked
 against it in CI. Python and Ansible are **not** required.
 
+> [!NOTE]
+> **This extension was entirely vibe-coded.** Design, code, tests and
+> documentation were written by an AI coding agent
+> ([Claude Code](https://claude.com/claude-code)). The author steered it and
+> tested the result in Zed. Review the code before trusting it with your
+> secrets.
+
 ## Usage
 
 Zed extensions cannot add commands, so everything goes through code actions
