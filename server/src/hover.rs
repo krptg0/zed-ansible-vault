@@ -27,7 +27,10 @@ pub fn target(doc: &Document, position: Position) -> Option<(String, Range)> {
 pub fn render(version: &str, vault_id: Option<&str>, plaintext: &str) -> String {
     let fence = "`".repeat(longest_backtick_run(plaintext).max(2) + 1);
     let id = vault_id.unwrap_or(crate::vault::DEFAULT_VAULT_ID);
-    format!("**Ansible Vault** · `{version}` · id `{id}`\n\n{fence}text\n{plaintext}\n{fence}")
+    format!(
+        "**Ansible Vault** · `{version}` · id `{id}`\n\n{fence}text\n{plaintext}\n{fence}\n\n\
+         _To decrypt in place: click inside the block, then open code actions (`cmd-.`)._"
+    )
 }
 
 pub fn render_error(message: &str) -> String {

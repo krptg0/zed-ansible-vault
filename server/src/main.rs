@@ -39,9 +39,29 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 /// Never logs params or results: they may contain secrets.
 fn trace(direction: &str, message: &Message) {
     match message {
+        Message::Request(request) if request.method == "textDocument/codeAction" => {
+            let range = &request.params["range"];
+            eprintln!(
+                "{direction} {} #{} range {}:{}-{}:{} only {}",
+                request.method,
+                request.id,
+                range["start"]["line"],
+                range["start"]["character"],
+                range["end"]["line"],
+                range["end"]["character"],
+                request.params["context"]["only"]
+            )
+        }
         Message::Request(request) => eprintln!("{direction} {} #{}", request.method, request.id),
         Message::Notification(notification) => eprintln!("{direction} {}", notification.method),
         Message::Response(response) => match &response.response_result {
+            Ok(serde_json::Value::Array(items)) => {
+                eprintln!(
+                    "{direction} response #{} ({} items)",
+                    response.id,
+                    items.len()
+                )
+            }
             Ok(_) => eprintln!("{direction} response #{}", response.id),
             Err(error) => eprintln!("{direction} error #{}: {}", response.id, error.message),
         },

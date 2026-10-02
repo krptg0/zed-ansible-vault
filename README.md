@@ -26,7 +26,8 @@ Zed extensions cannot add commands, so everything goes through code actions
 | File starting with `$ANSIBLE_VAULT;` | `cmd-.` → **Ansible Vault: Decrypt file** |
 | Whole buffer selected (`cmd-a`) | `cmd-.` → **Ansible Vault: Encrypt file** |
 
-`cmd-.` is Zed's `editor: toggle code actions`, mapped by keyboard layout: on a
+Code actions apply where the **text cursor** is, not under the mouse: click
+inside the block first. `cmd-.` is Zed's `editor: toggle code actions`, mapped by keyboard layout: on a
 French AZERTY Mac it is `cmd-;` (the `;` key, no shift). The command palette
 and the ⚡ indicator in the gutter open the same menu.
 
