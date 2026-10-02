@@ -29,6 +29,8 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
             connection.sender.send(outgoing)?;
         }
     }
+    // The writer thread only stops once every sender is dropped.
+    drop(connection);
     io_threads.join()?;
     Ok(())
 }
