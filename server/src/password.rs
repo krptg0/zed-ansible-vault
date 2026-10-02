@@ -594,6 +594,7 @@ mod tests {
         assert_eq!(f.resolve(None).unwrap().path, f.path("repo/env.pw"));
     }
 
+    #[cfg(unix)] // absolute paths without a drive letter
     #[test]
     fn setting_beats_everything() {
         let mut f = Fixture::new();
@@ -630,6 +631,7 @@ mod tests {
         assert_eq!(f.resolve(None).unwrap().path, f.path("elsewhere/other.pw"));
     }
 
+    #[cfg(unix)] // absolute paths without a drive letter
     #[test]
     fn falls_back_to_home_then_system_cfg() {
         let f = Fixture::new();
