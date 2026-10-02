@@ -1,5 +1,5 @@
 //! Cross-checks our envelopes against the real `ansible-vault` binary.
-//! Skipped (with a notice) when `ansible-vault` is not on PATH.
+//! Skipped when `ansible-vault` is not on PATH, unless REQUIRE_ANSIBLE_VAULT is set.
 
 use std::process::{Command, Stdio};
 
@@ -43,6 +43,11 @@ fn ansible_decrypt(envelope: &str, vault_id_arg: Option<&str>) -> String {
 #[test]
 fn ansible_vault_decrypts_our_envelopes() {
     if !ansible_vault_available() {
+        // CI sets REQUIRE_ANSIBLE_VAULT so the cross-check can't silently vanish.
+        assert!(
+            std::env::var_os("REQUIRE_ANSIBLE_VAULT").is_none(),
+            "REQUIRE_ANSIBLE_VAULT is set but ansible-vault is not on PATH"
+        );
         eprintln!("ansible-vault not found on PATH: cross-check skipped");
         return;
     }

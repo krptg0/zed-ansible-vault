@@ -15,17 +15,33 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let capabilities = serde_json::to_value(Server::capabilities())?;
     let params: InitializeParams = serde_json::from_value(connection.initialize(capabilities)?)?;
     let mut server = Server::new(params, Env::from_process());
+    eprintln!("ansible-vault-lsp {} started", env!("CARGO_PKG_VERSION"));
 
     for message in &connection.receiver {
+        trace("<-", &message);
         if let Message::Request(request) = &message {
             if connection.handle_shutdown(request)? {
                 break;
             }
         }
         for outgoing in server.handle(message) {
+            trace("->", &outgoing);
             connection.sender.send(outgoing)?;
         }
     }
     io_threads.join()?;
     Ok(())
+}
+
+/// Logs message names to stderr (shown in Zed's language server logs).
+/// Never logs params or results: they may contain secrets.
+fn trace(direction: &str, message: &Message) {
+    match message {
+        Message::Request(request) => eprintln!("{direction} {} #{}", request.method, request.id),
+        Message::Notification(notification) => eprintln!("{direction} {}", notification.method),
+        Message::Response(response) => match &response.response_result {
+            Ok(_) => eprintln!("{direction} response #{}", response.id),
+            Err(error) => eprintln!("{direction} error #{}: {}", response.id, error.message),
+        },
+    }
 }

@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use lsp_server::{ErrorCode, Message, Notification, Request, Response};
 use lsp_types::notification::{
@@ -54,10 +55,22 @@ impl Settings {
 /// Values decrypted in a document during this session.
 #[derive(Default)]
 struct Guard {
-    /// (value, seen in the document since it was decrypted)
-    values: Vec<(String, bool)>,
+    values: Vec<GuardedValue>,
     whole_file: bool,
 }
+
+/// A decrypted value is flagged while it occurs more often than it did
+/// before decryption, so identical text elsewhere does not pin the warning.
+struct GuardedValue {
+    value: String,
+    baseline: usize,
+    /// Became flagged at least once (the edit may not be applied yet).
+    seen: bool,
+}
+
+/// How long a password lookup failure is reused by hover, so a failing
+/// password script is not re-run on every mouse rest.
+const HOVER_ERROR_TTL: Duration = Duration::from_secs(15);
 
 pub struct Server {
     docs: HashMap<String, Document>,
@@ -69,6 +82,7 @@ pub struct Server {
     hover_cache: HoverCache,
     guards: HashMap<String, Guard>,
     flagged: HashSet<String>,
+    hover_password_error: Option<(Instant, String)>,
 }
 
 impl Server {
@@ -114,6 +128,7 @@ impl Server {
             hover_cache: HoverCache::default(),
             guards: HashMap::new(),
             flagged: HashSet::new(),
+            hover_password_error: None,
         }
     }
 
@@ -248,7 +263,14 @@ impl Server {
 
         let guard = self.guards.entry(data.uri.clone()).or_default();
         match resolved.revealed {
-            Revealed::Value(value) => guard.values.push((value, false)),
+            Revealed::Value(value) => {
+                let baseline = doc.text.matches(value.as_str()).count();
+                guard.values.push(GuardedValue {
+                    value,
+                    baseline,
+                    seen: false,
+                });
+            }
             Revealed::File => guard.whole_file = true,
             Revealed::Nothing => {}
         }
@@ -343,7 +365,21 @@ impl Server {
             setting: self.settings.vault_password_file.as_deref(),
             env: &self.env,
         };
-        let secrets = self.passwords.secrets(&ctx).map_err(|e| e.0)?;
+        if let Some((at, message)) = &self.hover_password_error {
+            if at.elapsed() < HOVER_ERROR_TTL {
+                return Err(message.clone());
+            }
+        }
+        let secrets = match self.passwords.secrets(&ctx) {
+            Ok(secrets) => {
+                self.hover_password_error = None;
+                secrets
+            }
+            Err(error) => {
+                self.hover_password_error = Some((Instant::now(), error.0.clone()));
+                return Err(error.0);
+            }
+        };
         let decrypted = vault::decrypt(envelope, &secrets).map_err(|e| e.to_string())?;
         let plaintext = String::from_utf8(decrypted.plaintext)
             .map_err(|_| "decrypted data is not UTF-8 text")?;
@@ -371,19 +407,19 @@ impl Server {
                 ));
             }
         }
-        guard.values.retain_mut(|(value, seen)| {
-            let present = doc.text.contains(value.as_str());
-            *seen |= present;
-            present || !*seen
+        guard.values.retain_mut(|guarded| {
+            let flagged = doc.text.matches(guarded.value.as_str()).count() > guarded.baseline;
+            guarded.seen |= flagged;
+            flagged || !guarded.seen
         });
-        for (value, _) in guard
-            .values
-            .iter()
-            .filter(|(v, _)| v.chars().count() >= GUARD_MIN_CHARS)
-        {
-            for (start, _) in doc.text.match_indices(value.as_str()) {
+        for guarded in &guard.values {
+            let flagged = doc.text.matches(guarded.value.as_str()).count() > guarded.baseline;
+            if !flagged || guarded.value.chars().count() < GUARD_MIN_CHARS {
+                continue;
+            }
+            for (start, _) in doc.text.match_indices(guarded.value.as_str()) {
                 diagnostics.push(warning(
-                    doc.range_of(start, start + value.len()),
+                    doc.range_of(start, start + guarded.value.len()),
                     "Decrypted vault value: re-encrypt it before saving or committing",
                 ));
             }
@@ -606,6 +642,47 @@ mod tests {
         let after_reencrypt = h.run_first(range(0, 13, 0, 19));
         assert_eq!(diagnostics(&after_reencrypt), Some(0));
         assert!(h.text().contains("$ANSIBLE_VAULT;1.1;AES256"));
+    }
+
+    #[test]
+    fn guard_ignores_copies_that_existed_before_decryption() {
+        let mut h = Harness::new(true, Value::Null);
+        h.open("user: admin1\npassword: admin1\n");
+        h.run_first(range(1, 10, 1, 16));
+        let after_decrypt = h.run_first(range(2, 0, 2, 0));
+        assert_eq!(h.text(), "user: admin1\npassword: admin1\n");
+        assert_eq!(diagnostics(&after_decrypt), Some(2));
+        assert_eq!(diagnostics(&h.run_first(range(1, 10, 1, 16))), Some(0));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hover_does_not_rerun_a_failing_password_script() {
+        use std::os::unix::fs::PermissionsExt;
+        let mut h = Harness::new(false, json!({ "vaultPasswordFile": "pw.sh" }));
+        let runs = h.dir.path().join("runs");
+        let script = h.dir.path().join("repo/pw.sh");
+        std::fs::write(
+            &script,
+            format!("#!/bin/sh\necho run >> '{}'\nexit 1\n", runs.display()),
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let envelope = vault::encrypt(b"x", &vault::Secret::new("default", PASSWORD));
+        let body: String = envelope.lines().map(|l| format!("  {l}\n")).collect();
+        h.open(&format!("k: !vault |\n{body}"));
+        let uri = h.uri.clone();
+        for _ in 0..3 {
+            let (result, _) = h.request(
+                HoverRequest::METHOD,
+                json!({ "textDocument": { "uri": uri }, "position": { "line": 1, "character": 3 } }),
+            );
+            assert!(result.unwrap()["contents"]["value"]
+                .as_str()
+                .unwrap()
+                .contains("cannot decrypt"));
+        }
+        assert_eq!(std::fs::read_to_string(runs).unwrap().lines().count(), 1);
     }
 
     #[test]
