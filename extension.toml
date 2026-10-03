@@ -8,4 +8,4 @@ repository = "https://github.com/krptg0/zed-ansible-vault"
 
 [language_servers.ansible-vault-lsp]
 name = "Ansible Vault"
-languages = ["YAML", "Ansible", "Plain Text"]
+languages = ["YAML", "Ansible"]

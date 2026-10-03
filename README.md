@@ -93,16 +93,16 @@ password files.
 
 Restart the server after a change (`editor: restart language server`).
 
-The server attaches to `YAML`, `Ansible` and `Plain Text` files. Vault files
-without an extension (for example `group_vars/all/vault`) have no language in
-Zed, so map them explicitly:
+The server attaches to `YAML` and `Ansible` files. Vault files without an
+extension (for example `group_vars/all/vault`) have no language in Zed, so map
+them to YAML explicitly:
 
 ```jsonc
-{ "file_types": { "Plain Text": ["**/vault"] } }
+{ "file_types": { "YAML": ["**/vault"] } }
 ```
 
 To disable the server for a language:
-`"languages": { "Plain Text": { "language_servers": ["!ansible-vault-lsp", "..."] } }`.
+`"languages": { "YAML": { "language_servers": ["!ansible-vault-lsp", "..."] } }`.
 
 ## Installation
 
